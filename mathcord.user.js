@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Mathcord
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  Typeset equations in Discord messages.
 // @author       Till Hoffmann
 // @match        https://discordapp.com/*
@@ -12,6 +12,14 @@
 // @grant        GM_getResourceText
 // ==/UserScript==
 
+/**
+ * Evaluate whether an element has a certain class prefix.
+ */
+function hasClassPrefix(element, prefix) {
+    var classes = (element.getAttribute("class") || "").split();
+    return classes.some(x => x.startsWith(prefix));
+}
+
 (function() {
     'use strict';
     // Declare rendering options (see https://katex.org/docs/autorender.html#api for details)
@@ -20,6 +28,7 @@
             {left: "$$", right: "$$", display: true},
             {left: "\\(", right: "\\)", display: false},
             {left: "\\[", right: "\\]", display: true},
+            // Needs to come last to prevent over-eager matching of delimiters
             {left: "$", right: "$", display: false},
         ],
     };
@@ -34,19 +43,19 @@
     var config = { childList: true, subtree: true };
     var observer = new MutationObserver(function(mutations, observer) {
         for (let mutation of mutations) {
-            // Check whether we are dealing with an element in the scroller
             var target = mutation.target;
-            var classes = (target.getAttribute("class") || "").split();
-            if (target.tagName != "DIV" || !classes.some(x => x.startsWith("scroller"))) {
-                continue;
-            }
-
-            // Iterate over all elements and render them if they are messages
-            for (let added of mutation.addedNodes) {
-                classes = (added.getAttribute("class") || "").split();
-                if (added.tagName == "DIV" && classes.some(x => x.startsWith("message"))) {
-                    renderMathInElement(added, options);
+            // Iterate over all messages added to the scroller and typeset them
+            if (target.tagName == "DIV" && hasClassPrefix(target, "scroller")) {
+                for (let added of mutation.addedNodes) {
+                    if (added.tagName == "DIV" && hasClassPrefix(added, "message")) {
+                        renderMathInElement(added, options);
+                    }
                 }
+            }
+            // Respond to edited messages
+            else if (target.tagName == "DIV" && hasClassPrefix(target, "container") &&
+                       hasClassPrefix(target.parentNode, "message")) {
+                renderMathInElement(target, options);
             }
         }
     });
