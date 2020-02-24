@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Mathcord
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Typeset equations in Discord messages.
 // @author       Till Hoffmann
 // @match        https://discordapp.com/*
@@ -55,7 +55,13 @@ function hasClassPrefix(element, prefix) {
             // Respond to edited messages
             else if (target.tagName == "DIV" && hasClassPrefix(target, "container") &&
                        hasClassPrefix(target.parentNode, "message")) {
-                renderMathInElement(target, options);
+                for (let added of mutation.addedNodes) {
+                    // Do not typeset the interactive edit container
+                    if (added.tagName == "DIV" && !added.getAttribute("class")) {
+                        continue;
+                    }
+                    setTimeout(_ => renderMathInElement(added, options), 1000);
+                }
             }
         }
     });
